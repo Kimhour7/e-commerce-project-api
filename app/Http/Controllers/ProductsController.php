@@ -7,6 +7,7 @@ use App\Models\products;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Validation\ValidationException;
 
 
 class ProductsController extends Controller
@@ -59,12 +60,20 @@ class ProductsController extends Controller
      */
     public function store(Request $request, Category $category)
     {
-        $validated = $request->validate([
-            'name' => 'required',
-            'description' => 'required',
-            'price' => 'required',
-            'image' => 'required',
-        ]);
+        try {
+            $validatedData = $request->validate([
+                'name' => 'required',
+                'description' => 'required',
+                'price' => 'required',
+                'image' => 'required',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        }
 
         $imagePath = null;
         if($request->hasFile('image')) {

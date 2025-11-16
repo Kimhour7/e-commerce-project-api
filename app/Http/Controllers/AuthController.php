@@ -8,17 +8,27 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Hash;
 use Exception;
+use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
     public function register(Request $request)
     {
-        $request->validate([
-            'name' => 'required',
-            'email' => 'required|email|unique:users',
-            'password' => 'required|min:6',
-            'avatar' => 'nullable|image|max:2048',
-        ]);
+        try {
+            $validatedData = $request->validate([
+                'name' => 'required',
+                'email' => 'required|email|unique:users',
+                'password' => 'required|min:6',
+                'phone' => 'required',
+                'avatar' => 'nullable|image|max:2048',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        }
 
         $avatarPath = null;
         if($request->hasFile('avatar')) {
@@ -29,6 +39,7 @@ class AuthController extends Controller
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
+            'phone' => $request->phone,
             'password' => Hash::make($request->password),
             'avatar' => $avatarPath,
         ]);
@@ -37,28 +48,44 @@ class AuthController extends Controller
             'status' => 'success',
             'message' => 'User created successfully',
             'user' => $user
-        ]);
+        ], 200);
     }
 
     public function login(Request $request){
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
-        ]);
-
+        try {
+            $validatedData = $request->validate([
+                'email' => 'required|email',
+                'password' => 'required',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        }
         $user = User::where('email', $request->email)->first();
-        if($user->status == 'inactive') {
+        
+        if (!$user) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'User not found',
+                'errors' => ['email' => ['The provided credentials are incorrect.']]
+            ], 401);
+        }
+
+        if ($user->status == 'inactive') {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Your account has been deleted'
-            ]);
+            ], 401);
         }
 
         if(!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Invalid credentials'
-            ]);
+                'message' => 'Email or password is incorrect.'
+            ], 401);
         }
 
         $token = $user->createToken('auth-token')->plainTextToken;
@@ -70,7 +97,7 @@ class AuthController extends Controller
             'user' => $user,
             'token' => $token,
             'profile_picture' => $url,
-        ]);
+        ], 200);
     }
 
     public function update(Request $request){
@@ -78,6 +105,7 @@ class AuthController extends Controller
             $request->validate([
                 'name' => 'nullable|string',
                 'password' => 'nullable|min:6',
+                'phone' => 'nullable|string',
                 'avatar' => 'nullable|image|max:2048',
             ]);
 
@@ -100,6 +128,10 @@ class AuthController extends Controller
                 $user->name = $request->name;
             }
 
+            if($request->phone){
+                $user->phone = $request->phone;
+            }
+
             $user->save();
 
         return response()->json([
@@ -107,12 +139,12 @@ class AuthController extends Controller
             'message' => 'User updated successfully',
             'user' => $user,
             'profile_picture' => Storage::url($user->avatar),
-        ]);
+        ], 200);
         }catch(Exception $e){
             return response()->json([
                 'status' => 'error',
                 'message' => $e->getMessage()
-            ]);
+            ], 500);
         }
     }
 
@@ -123,14 +155,14 @@ class AuthController extends Controller
             'status' => 'success',
             'message' => 'User logged out successfully',
             'user' => $request->user(),
-        ]);
+        ], 200);
         if ($request->user()) {
             $request->user()->currentAccessToken()->delete();
 
             return response()->json([
             'status' => 'success',
             'message' => 'User logged out successfully',
-        ]);
+        ], 200);
         }
 
         return response()->json([
@@ -148,6 +180,6 @@ class AuthController extends Controller
             'status' => 'success',
             'message' => 'User deleted successfully',
             'user' => $user,
-        ]);
+        ], 200);
     }
 }

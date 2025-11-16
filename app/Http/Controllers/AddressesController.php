@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\addresses;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class AddressesController extends Controller
 {
@@ -33,21 +34,21 @@ class AddressesController extends Controller
      */
     public function store(Request $request)
     {
-        $validate = $request->validate([
-            'line1' => 'required',
-            'city' => 'required',
-            'country' => 'required',
-            'postal_code' => 'required',
-            'longitude' => 'required',
+        try {
+            $validatedData = $request->validate([
+                'line1' => 'required',
+                'city' => 'required',
+                'country' => 'required',
+                'postal_code' => 'required',
+                'longitude' => 'required',
             'latitude' => 'required',
         ]);
-
-        if (!$validate) {
+        } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Validation failed',
-                'errors' => $validate->errors(),
-            ]);
+                'errors' => $e->errors()
+            ], 422);
         }
 
         $address = addresses::create([

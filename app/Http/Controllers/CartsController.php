@@ -6,6 +6,7 @@ use App\Models\carts;
 use App\Models\cart_items;
 use App\Models\products;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class CartsController extends Controller
 {
@@ -41,10 +42,18 @@ class CartsController extends Controller
      */
     public function store(Request $request)
     {
-        $request->validate([
-            'product_id' => 'required',
-            'quantity' => 'required',
-        ]);
+        try {
+            $validatedData = $request->validate([
+                'product_id' => 'required',
+                'quantity' => 'required',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        }
 
         $user = auth()->user();
         $product = products::find($request->product_id);
